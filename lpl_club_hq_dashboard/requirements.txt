@@ -1,0 +1,8 @@
+streamlit
+google-cloud-bigquery
+pandas
+toml
+requests
+db-dtypes
+python-dateutil
+altair

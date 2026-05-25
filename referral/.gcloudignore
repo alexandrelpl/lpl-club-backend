@@ -1,0 +1,23 @@
+# On ignore les fichiers de gestion de version
+.git
+.gitignore
+
+# On ignore les fichiers temporaires Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# On ignore les environnements virtuels locaux
+env/
+venv/
+.env/
+
+# On ignore les fichiers système inutiles (Mac/Windows)
+.DS_Store
+Thumbs.db
+
+# --- SECTION SÉCURITÉ ---
+# Si tu n'utilises pas Secret Manager et que tu veux uploader tes secrets, 
+# NE METS PAS la ligne ci-dessous. 
+# Mais si tu passes par Secret Manager un jour, ajoute-la :
+# secrets.toml
