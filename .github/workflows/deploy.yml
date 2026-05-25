@@ -1,0 +1,152 @@
+name: Deploy to Cloud Run
+ 
+on:
+  push:
+    branches: [main]
+ 
+env:
+  PROJECT_ID: shopify-data-ltv
+  REGION: europe-west1
+ 
+jobs:
+  # -------------------------------------------------------
+  # Détecte quels dossiers ont changé
+  # -------------------------------------------------------
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      lpl_club: ${{ steps.filter.outputs.lpl_club }}
+      referral: ${{ steps.filter.outputs.referral }}
+      referral_portal: ${{ steps.filter.outputs.referral_portal }}
+      dashboard: ${{ steps.filter.outputs.dashboard }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            lpl_club:
+              - 'lpl_club/**'
+            referral:
+              - 'referral/**'
+            referral_portal:
+              - 'referral_portal_shopify/**'
+            dashboard:
+              - 'lpl_club_hq_dashboard/**'
+ 
+  # -------------------------------------------------------
+  # lpl-club-sync  ←  lpl_club/
+  # -------------------------------------------------------
+  deploy-lpl-club-sync:
+    needs: changes
+    if: needs.changes.outputs.lpl_club == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy lpl-club-sync
+        run: |
+          gcloud run deploy lpl-club-sync \
+            --source lpl_club/ \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --quiet
+ 
+  # -------------------------------------------------------
+  # Services referral/ (webhook + crons)
+  # Un seul build, 3 déploiements avec CMD override
+  # -------------------------------------------------------
+  deploy-referral-services:
+    needs: changes
+    if: needs.changes.outputs.referral == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+ 
+      - name: Build image referral (une seule fois)
+        run: |
+          IMAGE="europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/referral:${{ github.sha }}"
+          gcloud builds submit referral/ \
+            --tag $IMAGE \
+            --project $PROJECT_ID \
+            --quiet
+          echo "REFERRAL_IMAGE=$IMAGE" >> $GITHUB_ENV
+ 
+      - name: Deploy data-cron-sync
+        run: |
+          gcloud run deploy data-cron-sync \
+            --image $REFERRAL_IMAGE \
+            --command python \
+            --args cron_sync.py \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --quiet
+ 
+      - name: Deploy klaviyo-referral-sync
+        run: |
+          gcloud run deploy klaviyo-referral-sync \
+            --image $REFERRAL_IMAGE \
+            --command python \
+            --args cron_klaviyo_sync.py \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --quiet
+ 
+      - name: Deploy app-webhook
+        run: |
+          gcloud run deploy app-webhook \
+            --image $REFERRAL_IMAGE \
+            --command python \
+            --args webhook.py \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --quiet
+ 
+  # -------------------------------------------------------
+  # portail-client  ←  referral_portal_shopify/
+  # -------------------------------------------------------
+  deploy-portail-client:
+    needs: changes
+    if: needs.changes.outputs.referral_portal == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy portail-client
+        run: |
+          gcloud run deploy portail-client \
+            --source referral_portal_shopify/ \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --quiet
+ 
+  # -------------------------------------------------------
+  # app-lpl-club-dashboard  ←  lpl_club_hq_dashboard/
+  # -------------------------------------------------------
+  deploy-dashboard:
+    needs: changes
+    if: needs.changes.outputs.dashboard == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy app-lpl-club-dashboard
+        run: |
+          gcloud run deploy app-lpl-club-dashboard \
+            --source lpl_club_hq_dashboard/ \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --quiet
