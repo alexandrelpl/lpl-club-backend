@@ -228,4 +228,4 @@ def trigger_sync():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port)# CI/CD test - Mon May 25 04:24:04 PM UTC 2026
