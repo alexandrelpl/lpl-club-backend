@@ -125,7 +125,7 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Deploy portail-client
         run: |
-          gcloud run deploy portail-client \
+          gcloud run deploy app-api-shopify \
             --source referral_portal_shopify/ \
             --region $REGION \
             --project $PROJECT_ID \
