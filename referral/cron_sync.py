@@ -115,8 +115,8 @@ def cron_sync_orders():
     
     cursor = None
     has_next = True
-    total_orders_inserted = 0
-    total_products_inserted = 0
+    all_rows_finance = []
+    all_rows_products = []
 
     while has_next:
         variables = {"query": query_string, "cursor": cursor}
@@ -131,10 +131,6 @@ def cron_sync_orders():
             break
             
         orders = res["data"]["orders"]
-        
-        # Réinitialisation des tableaux à chaque tour de boucle (Batching)
-        rows_finance = []
-        rows_products = []
         
         for order in orders.get("nodes", []):
             if order.get("cancelledAt"): continue
@@ -178,7 +174,7 @@ def cron_sync_orders():
             shipping_lines = order.get("shippingLines", {}).get("nodes", [])
             shipping_method = shipping_lines[0].get("title") if shipping_lines else None
 
-            rows_finance.append({
+            all_rows_finance.append({
                 "order_date": order_date,
                 "client_id": client_id,
                 "net_sales": net_sales,
@@ -191,7 +187,7 @@ def cron_sync_orders():
             
             for item in order.get("lineItems", {}).get("nodes", []):
                 product_type = item.get("product", {}).get("productType") if item.get("product") else None
-                rows_products.append({
+                all_rows_products.append({
                     "order_date": order_date,
                     "order_id": order_id,
                     "client_id": client_id,
@@ -201,17 +197,21 @@ def cron_sync_orders():
                     "price": float(item.get("originalTotalSet", {}).get("shopMoney", {}).get("amount", 0))
                 })
         
-        # --- NOUVEAU : Insertion BQ par lots (Batch) pour éviter la perte de données ---
-        if rows_finance:
-            client.insert_rows_json(table_finance, rows_finance)
-            total_orders_inserted += len(rows_finance)
-            
-        if rows_products:
-            client.insert_rows_json(table_products, rows_products)
-            total_products_inserted += len(rows_products)
-            
         has_next = orders.get("pageInfo", {}).get("hasNextPage", False)
         cursor = orders.get("pageInfo", {}).get("endCursor")
+
+    # Insertion groupée via batch load (évite le conflit streaming buffer / DELETE)
+    load_cfg = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+    total_orders_inserted = 0
+    total_products_inserted = 0
+
+    if all_rows_finance:
+        client.load_table_from_json(all_rows_finance, table_finance, job_config=load_cfg).result()
+        total_orders_inserted = len(all_rows_finance)
+
+    if all_rows_products:
+        client.load_table_from_json(all_rows_products, table_products, job_config=load_cfg).result()
+        total_products_inserted = len(all_rows_products)
     
     print(f"✅ Succès ! Inséré au total: {total_orders_inserted} commandes et {total_products_inserted} produits.")
     return jsonify({"status": "success", "orders_inserted": total_orders_inserted, "products_inserted": total_products_inserted}), 200
