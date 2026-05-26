@@ -81,7 +81,7 @@ def cron_sync_orders():
 
     query = """
     query ($query: String!, $cursor: String) {
-      orders(first: 25, query: $query, after: $cursor, sortKey: CREATED_AT) {
+      orders(first: 250, query: $query, after: $cursor, sortKey: CREATED_AT) {
         pageInfo { hasNextPage endCursor }
         nodes {
           id createdAt cancelledAt displayFinancialStatus tags sourceName email phone
@@ -212,7 +212,6 @@ def cron_sync_orders():
             
         has_next = orders.get("pageInfo", {}).get("hasNextPage", False)
         cursor = orders.get("pageInfo", {}).get("endCursor")
-        time.sleep(0.5)
     
     print(f"✅ Succès ! Inséré au total: {total_orders_inserted} commandes et {total_products_inserted} produits.")
     return jsonify({"status": "success", "orders_inserted": total_orders_inserted, "products_inserted": total_products_inserted}), 200
