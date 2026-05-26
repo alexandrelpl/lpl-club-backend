@@ -71,21 +71,10 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - uses: google-github-actions/setup-gcloud@v2
  
-      - name: Build image referral (une seule fois)
-        run: |
-          IMAGE="europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/referral:${{ github.sha }}"
-          gcloud builds submit referral/ \
-            --tag $IMAGE \
-            --project $PROJECT_ID \
-            --quiet
-          echo "REFERRAL_IMAGE=$IMAGE" >> $GITHUB_ENV
- 
       - name: Deploy data-cron-sync
         run: |
           gcloud run deploy data-cron-sync \
-            --image $REFERRAL_IMAGE \
-            --command python \
-            --args cron_sync.py \
+            --source referral/ \
             --region $REGION \
             --project $PROJECT_ID \
             --quiet
@@ -93,9 +82,7 @@ jobs:
       - name: Deploy klaviyo-referral-sync
         run: |
           gcloud run deploy klaviyo-referral-sync \
-            --image $REFERRAL_IMAGE \
-            --command python \
-            --args cron_klaviyo_sync.py \
+            --source referral/ \
             --region $REGION \
             --project $PROJECT_ID \
             --quiet
@@ -103,9 +90,7 @@ jobs:
       - name: Deploy app-webhook
         run: |
           gcloud run deploy app-webhook \
-            --image $REFERRAL_IMAGE \
-            --command python \
-            --args webhook.py \
+            --source referral/ \
             --region $REGION \
             --project $PROJECT_ID \
             --quiet
