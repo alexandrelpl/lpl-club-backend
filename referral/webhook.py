@@ -2,11 +2,15 @@ import os
 import requests
 import re
 import toml
+from datetime import date, timedelta
 from flask import Flask, request, jsonify
 from google.cloud import bigquery
 
 app = Flask(__name__)
 PROJECT_ID = "shopify-data-ltv"
+
+# Variant ID du produit "Adhésion LPL Club" (2,90€)
+LPL_CLUB_MEMBERSHIP_VARIANT_ID = int(os.environ.get("LPL_CLUB_MEMBERSHIP_VARIANT_ID", "55725365625217"))
 
 try:
     secrets = toml.load(".streamlit/secrets.toml")
@@ -74,6 +78,57 @@ def trigger_klaviyo_update(owner_email, current_lpl_usage, max_usage, bq_client)
         else: print(f"❌ Erreur Klaviyo API : {response.text}", flush=True)
     except Exception as e: print(f"Erreur critique Klaviyo: {e}", flush=True)
 
+def write_lpl_club_metafields(customer_gid):
+    """Écrit lpl_club.active=true et lpl_club.expiry_date=aujourd'hui+1an sur le customer Shopify."""
+    expiry = (date.today() + timedelta(days=365)).isoformat()
+    mutation = """
+    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { id }
+        userErrors { field message }
+      }
+    }
+    """
+    metafields = [
+        {"ownerId": customer_gid, "namespace": "lpl_club", "key": "active", "type": "boolean", "value": "true"},
+        {"ownerId": customer_gid, "namespace": "lpl_club", "key": "expiry_date", "type": "date", "value": expiry}
+    ]
+    result = run_shopify_graphql(mutation, {"metafields": metafields})
+    if result:
+        errors = result.get("data", {}).get("metafieldsSet", {}).get("userErrors", [])
+        if errors:
+            print(f"❌ Erreur metafields LPL Club ({customer_gid}): {errors}", flush=True)
+            return False
+        print(f"✅ LPL Club activé ({customer_gid}) jusqu'au {expiry}", flush=True)
+        return True
+    return False
+
+def handle_lpl_club_membership(data):
+    """
+    Détecte le produit Adhésion LPL Club dans les line_items de la commande.
+    Si trouvé : écrit les metafields Shopify immédiatement.
+    Retourne True si une adhésion a été traitée.
+    """
+    line_items = data.get("line_items", [])
+    membership_found = any(
+        int(item.get("variant_id") or 0) == LPL_CLUB_MEMBERSHIP_VARIANT_ID
+        for item in line_items
+    )
+    if not membership_found:
+        return False
+
+    customer = data.get("customer", {})
+    customer_id = customer.get("id")
+    customer_email = data.get("email", "")
+
+    if not customer_id:
+        print(f"⚠️ Adhésion LPL Club détectée mais pas de customer_id pour {customer_email}", flush=True)
+        return False
+
+    customer_gid = f"gid://shopify/Customer/{customer_id}"
+    print(f"🎯 Adhésion LPL Club détectée pour {customer_email} (order {data.get('id')})", flush=True)
+    return write_lpl_club_metafields(customer_gid)
+
 def block_referral_code(code, rule_id, reason):
     print(f"⛔ BLOCAGE DU CODE {code} : {reason}", flush=True)
     q_block = f"UPDATE `{PROJECT_ID}.shopify_data_eu.referral_codes` SET status = 'BLOCKED_FRAUD' WHERE code = @code"
@@ -87,6 +142,9 @@ def handle_webhook():
     customer_email = data.get("email", "").lower()
     raw_phone = data.get("phone") or data.get("billing_address", {}).get("phone") or ""
     customer_phone = normalize_phone(raw_phone)
+
+    # --- Détection adhésion LPL Club ---
+    handle_lpl_club_membership(data)
 
     discount_codes = []
     if 'discount_applications' in data: discount_codes = [app.get('code', '').upper() for app in data['discount_applications'] if app.get('type') == 'discount_code']

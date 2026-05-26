@@ -1,0 +1,18 @@
+api_version = "2025-04"
+
+[[extensions]]
+type = "ui_extension"
+name = "LPL Club Membership Offer"
+handle = "lpl-club-membership-offer"
+
+  [[extensions.targeting]]
+  module = "./src/Checkout.tsx"
+  target = "purchase.checkout.block.render"
+
+[extensions.settings]
+
+  [[extensions.settings.fields]]
+  key = "membership_variant_id"
+  type = "single_line_text_field"
+  name = "Membership Variant ID"
+  description = "The Shopify variant ID for the LPL Club membership product"
