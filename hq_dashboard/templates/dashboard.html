@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketing Programs Dashboard — Le Petit Lunetier</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --navy: #1c4293;
+    --navy-light: #2a57c4;
+    --navy-bg: #e8eef8;
+    --bg: #f0f2f5;
+    --card: #ffffff;
+    --text: #1a1a2e;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --success: #059669;
+    --success-bg: #d1fae5;
+    --danger: #dc2626;
+    --danger-bg: #fee2e2;
+    --warning: #d97706;
+    --warning-bg: #fef3c7;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* HEADER */
+  .header {
+    background: var(--navy);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .header-logo { height: 38px; filter: brightness(0) invert(1); }
+  .header-title { color: #fff; font-size: 21px; font-weight: 700; letter-spacing: -.3px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .header-user { color: rgba(255,255,255,.75); font-size: 13px; }
+  .btn { padding: 7px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; }
+  .btn-ghost { background: rgba(255,255,255,.15); color: #fff; }
+  .btn-ghost:hover { background: rgba(255,255,255,.25); }
+  .btn-primary { background: #fff; color: var(--navy); }
+  .btn-primary:hover { background: var(--navy-bg); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+  /* TABS */
+  .tab-bar {
+    background: var(--card);
+    border-bottom: 2px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    gap: 10px;
+  }
+  .tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    cursor: pointer;
+    transition: all .18s;
+    text-align: left;
+    min-width: 210px;
+  }
+  .tab-btn-icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+  .tab-btn-title {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: .2px;
+    transition: color .18s;
+  }
+  .tab-btn-desc {
+    display: block;
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 1px;
+    transition: color .18s;
+  }
+  .tab-btn.active {
+    background: var(--navy);
+    border-color: var(--navy);
+    box-shadow: 0 2px 8px rgba(28,66,147,.25);
+  }
+  .tab-btn.active .tab-btn-title { color: #fff; }
+  .tab-btn.active .tab-btn-desc  { color: rgba(255,255,255,.7); }
+  .tab-btn:hover:not(.active) {
+    border-color: var(--navy-light);
+    background: var(--navy-bg);
+  }
+  .tab-btn:hover:not(.active) .tab-btn-title { color: var(--navy); }
+  .tab-btn:hover:not(.active) .tab-btn-desc  { color: var(--navy-light); }
+
+  /* CONTENT */
+  .content { padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* SECTION HEADER */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title { font-size: 15px; font-weight: 600; color: var(--text); }
+
+  /* KPI GRID */
+  .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  .kpi-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .kpi-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+  .kpi-value { font-size: 26px; font-weight: 700; color: var(--navy); line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* CHARTS */
+  .chart-grid-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 20px; }
+  .chart-grid-2b { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .chart-grid-2, .chart-grid-2b { grid-template-columns: 1fr; } }
+  .chart-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+  }
+  .chart-card h3 { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px; }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap-sm { position: relative; height: 180px; }
+
+  /* LIVE GRID */
+  .live-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .live-grid { grid-template-columns: 1fr; } }
+
+  /* TABLES */
+  .table-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .table-card-header {
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; background: #fafafa; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 14px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafbff; }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .badge-web { background: #dbeafe; color: #1d4ed8; }
+  .badge-retail { background: #d1fae5; color: #065f46; }
+  .badge-manuel { background: #fef3c7; color: #92400e; }
+  .badge-boutique { background: #ede9fe; color: #5b21b6; }
+  .badge-active { background: var(--success-bg); color: var(--success); }
+  .badge-max { background: var(--warning-bg); color: var(--warning); }
+  .badge-blocked { background: var(--danger-bg); color: var(--danger); }
+  .badge-archived { background: #f3f4f6; color: #6b7280; }
+
+  /* FORM */
+  .form-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .form-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .form-group input, .form-group textarea {
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .form-group input:focus, .form-group textarea:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(28,66,147,.1); }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+  .btn-navy { background: var(--navy); color: #fff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
+  .btn-navy:hover { background: var(--navy-light); }
+  .btn-navy:disabled { background: #9ca3af; cursor: not-allowed; }
+
+  /* ALERTS */
+  .alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 10px; display: none; }
+  .alert-success { background: var(--success-bg); color: var(--success); }
+  .alert-error { background: var(--danger-bg); color: var(--danger); }
+
+  /* DIVIDER */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* KPI SECTIONS */
+  .kpi-sections { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+  .kpi-section {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .kpi-section-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .kpi-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--navy);
+  }
+  .kpi-section-desc {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .kpi-section-body {
+    padding: 14px 16px 16px;
+    display: grid;
+    gap: 10px;
+  }
+  .kpi-section-body-3 { grid-template-columns: 1.1fr 1fr 1fr; }
+  .kpi-section-body-recrut { grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) {
+    .kpi-section-body-3 { grid-template-columns: 1fr; }
+    .kpi-section-body-recrut { grid-template-columns: 1fr; }
+  }
+  .kpi-mini {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px 16px;
+    border-left: 3px solid transparent;
+  }
+  .kpi-mini-total { background: var(--navy-bg); border-left-color: var(--navy); }
+  .kpi-mini-web   { border-left-color: #3b82f6; }
+  .kpi-mini-retail{ border-left-color: #10b981; }
+  .kpi-mini .kpi-label { margin-bottom: 5px; }
+  .kpi-mini .kpi-value { font-size: 24px; }
+  .kpi-channel-header {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi-channel-header.web    { color: #3b82f6; }
+  .kpi-channel-header.retail { color: #10b981; }
+  .kpi-period-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @media (max-width: 600px) { .kpi-period-row { grid-template-columns: 1fr; } }
+
+  /* SPINNER */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { color: var(--muted); font-size: 13px; padding: 20px; text-align: center; }
+
+  /* KPI TREND ROWS */
+  .kpi-trend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 9px;
+    padding-top: 9px;
+    border-top: 1px solid rgba(0,0,0,.07);
+    min-height: 34px;
+  }
+  .kpi-trend-block { line-height: 1; }
+  .kpi-trend-val {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .kpi-trend-unit {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .kpi-wow {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 99px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .kpi-wow.up   { background: #d1fae5; color: #065f46; }
+  .kpi-wow.down { background: #fee2e2; color: #991b1b; }
+  .kpi-wow.flat { background: #f3f4f6; color: #9ca3af; }
+
+  /* PAGE LOADER */
+  #page-loader {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(240,242,245,.88);
+    backdrop-filter: blur(3px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px;
+    transition: opacity .3s;
+  }
+  #page-loader.hidden { opacity: 0; pointer-events: none; }
+  .loader-ring {
+    width: 44px; height: 44px;
+    border: 4px solid rgba(28,66,147,.15);
+    border-top-color: var(--navy);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  .loader-label { font-size: 13px; color: var(--muted); font-weight: 500; }
+
+  /* KPI SKELETON */
+  .kpi-skeleton {
+    display: inline-block;
+    width: 60px; height: 28px;
+    background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 6px;
+    vertical-align: middle;
+  }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 999;
+    background: #1a1a2e; color: #fff;
+    padding: 12px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    opacity: 0; transform: translateY(8px);
+    transition: all .25s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.success { background: var(--success); }
+  #toast.error { background: var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- Overlay de chargement initial -->
+<div id="page-loader">
+  <div class="loader-ring"></div>
+  <div class="loader-label">Chargement du dashboard…</div>
+</div>
+
+<header class="header">
+  <div class="header-left">
+    <img class="header-logo" src="https://cdn.shopify.com/s/files/1/1169/1934/files/Logo_Bleu_-_Square.png?v=1770911062" alt="LPL">
+    <span class="header-title">Marketing Programs Dashboard</span>
+  </div>
+  <div class="header-right">
+    <span class="header-user">{{ user_name or user_email }}</span>
+    <button class="btn btn-ghost btn-sm" onclick="runEtl()" id="etl-btn">🔄 Actualiser BDD</button>
+    <a href="/logout" class="btn btn-ghost btn-sm">Déconnexion</a>
+  </div>
+</header>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('lpl', this)">
+    <span class="tab-btn-icon">📊</span>
+    <span>
+      <span class="tab-btn-title">LPL Club</span>
+      <span class="tab-btn-desc">Membres · Utilisation · Recrutement</span>
+    </span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('referral', this)">
+    <span class="tab-btn-icon">🤝</span>
+    <span>
+      <span class="tab-btn-title">Parrainage</span>
+      <span class="tab-btn-desc">Filleuls · CA · Budget programme</span>
+    </span>
+  </button>
+</div>
+
+<div class="content">
+
+  <!-- ============================================================ LPL CLUB TAB -->
+  <div id="tab-lpl" class="tab-panel active">
+
+    <!-- KPIs — Sections organisées -->
+    <div class="kpi-sections" id="lpl-kpis">
+
+      <!-- MEMBRES ACTIFS -->
+      <div class="kpi-section">
+        <div class="kpi-section-header">
+          <span class="kpi-section-title">Membres actifs</span>
+          <span class="kpi-section-desc">Abonnements LPL Club en cours de validité (moins d'un an depuis l'adhésion)</span>
+        </div>
+        <div class="kpi-section-body kpi-section-body-3">
+          <div class="kpi-mini kpi-mini-total">
+            <div class="kpi-label">Total</div>
+            <div class="kpi-value" id="k-total"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">tous canaux confondus</div>
+            <div class="kpi-trend-row" id="k-total-adh-trend">
+              <div class="kpi-trend-block">
+                <div class="kpi-trend-val kpi-skeleton" style="width:28px;height:16px"></div>
+                <div class="kpi-trend-unit">nouvelles /7j</div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-mini kpi-mini-web">
+            <div class="kpi-label">🌐 Web</div>
+            <div class="kpi-value" id="k-web-active"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">adhésions en ligne</div>
+            <div class="kpi-trend-row" id="k-web-adh-trend">
+              <div class="kpi-trend-block">
+                <div class="kpi-trend-val kpi-skeleton" style="width:28px;height:16px"></div>
+                <div class="kpi-trend-unit">nouvelles /7j</div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-mini kpi-mini-retail">
+            <div class="kpi-label">🏪 Retail</div>
+            <div class="kpi-value" id="k-retail-active"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">adhésions en boutique</div>
+            <div class="kpi-trend-row" id="k-retail-adh-trend">
+              <div class="kpi-trend-block">
+                <div class="kpi-trend-val kpi-skeleton" style="width:28px;height:16px"></div>
+                <div class="kpi-trend-unit">nouvelles /7j</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAUX D'UTILISATION -->
+      <div class="kpi-section">
+        <div class="kpi-section-header">
+          <span class="kpi-section-title">Taux d'utilisation</span>
+          <span class="kpi-section-desc">Part des membres actifs ayant utilisé leur avantage -10% au moins une fois</span>
+        </div>
+        <div class="kpi-section-body kpi-section-body-3">
+          <div class="kpi-mini kpi-mini-total">
+            <div class="kpi-label">Total</div>
+            <div class="kpi-value" id="k-util"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">membres ayant utilisé au moins une fois</div>
+            <div class="kpi-trend-row" id="k-util-total-trend">
+              <div class="kpi-trend-block">
+                <div class="kpi-trend-val kpi-skeleton" style="width:28px;height:16px"></div>
+                <div class="kpi-trend-unit">actifs /7j</div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-mini kpi-mini-web">
+            <div class="kpi-label">🌐 Web</div>
+            <div class="kpi-value" id="k-util-web"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">discount -10% auto détecté</div>
+            <div class="kpi-trend-row" id="k-util-web-trend">
+              <div class="kpi-trend-block">
+                <div class="kpi-trend-val kpi-skeleton" style="width:28px;height:16px"></div>
+                <div class="kpi-trend-unit">actifs /7j</div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-mini kpi-mini-retail">
+            <div class="kpi-label">🏪 Retail</div>
+            <div class="kpi-value" id="k-util-retail"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">visite LPLCLUB après la date d'adhésion</div>
+            <div class="kpi-trend-row" id="k-util-retail-trend">
+              <div class="kpi-trend-block">
+                <div class="kpi-trend-val kpi-skeleton" style="width:28px;height:16px"></div>
+                <div class="kpi-trend-unit">actifs /7j</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECRUTEMENT -->
+      <div class="kpi-section">
+        <div class="kpi-section-header">
+          <span class="kpi-section-title">Recrutement</span>
+          <span class="kpi-section-desc">Part des commandes / passages incluant une nouvelle adhésion LPL Club</span>
+        </div>
+        <div class="kpi-section-body kpi-section-body-recrut">
+          <div>
+            <div class="kpi-channel-header web">🌐 Web</div>
+            <div class="kpi-period-row">
+              <div class="kpi-mini kpi-mini-web">
+                <div class="kpi-label">10 dernières semaines</div>
+                <div class="kpi-value" id="k-web10"><span class="kpi-skeleton"></span></div>
+                <div class="kpi-sub">% des commandes payées</div>
+              </div>
+              <div class="kpi-mini kpi-mini-web">
+                <div class="kpi-label">7 derniers jours</div>
+                <div class="kpi-value" id="k-web7"><span class="kpi-skeleton"></span></div>
+                <div class="kpi-sub">% des commandes payées</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="kpi-channel-header retail">🏪 Retail</div>
+            <div class="kpi-period-row">
+              <div class="kpi-mini kpi-mini-retail">
+                <div class="kpi-label">10 dernières semaines</div>
+                <div class="kpi-value" id="k-ret10"><span class="kpi-skeleton"></span></div>
+                <div class="kpi-sub">% des passages en caisse</div>
+              </div>
+              <div class="kpi-mini kpi-mini-retail">
+                <div class="kpi-label">7 derniers jours</div>
+                <div class="kpi-value" id="k-ret7"><span class="kpi-skeleton"></span></div>
+                <div class="kpi-sub">% des passages en caisse</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Adhésions par jour (full width) -->
+    <div class="chart-card">
+      <h3>Adhésions par jour — 14 derniers jours</h3>
+      <div class="chart-wrap"><canvas id="chart-adhesions-daily"></canvas></div>
+    </div>
+
+    <!-- Adhésions par semaine (full width) -->
+    <div class="chart-card">
+      <h3>Adhésions par semaine — 10 dernières semaines</h3>
+      <div class="chart-wrap"><canvas id="chart-adhesions"></canvas></div>
+    </div>
+
+    <!-- Pie + Utilisations -->
+    <div class="chart-grid-2">
+      <div class="chart-card" style="margin-bottom:0">
+        <h3>Origine des adhésions (10 sem.)</h3>
+        <div class="chart-wrap-sm"><canvas id="chart-pie-source"></canvas></div>
+      </div>
+      <div class="chart-card" style="margin-bottom:0">
+        <h3>Utilisations — Web vs Boutique (10 sem.)</h3>
+        <div class="chart-wrap"><canvas id="chart-uses"></canvas></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Live flux — Adhésions -->
+    <div class="live-grid">
+      <div class="table-card">
+        <div class="table-card-header">🌐 30 dernières adhésions WEB</div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Email</th><th>Date</th></tr></thead>
+            <tbody id="tbl-members-web"><tr><td colspan="2" class="loading-text">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-card-header">🏪 30 dernières adhésions RETAIL</div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Email</th><th>Date</th></tr></thead>
+            <tbody id="tbl-members-retail"><tr><td colspan="2" class="loading-text">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live flux — Utilisations -->
+    <div class="live-grid">
+      <div class="table-card">
+        <div class="table-card-header">🌐 30 dernières utilisations WEB</div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Email</th><th>Code utilisé</th><th>Date</th></tr></thead>
+            <tbody id="tbl-uses-web"><tr><td colspan="3" class="loading-text">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-card-header">🏪 30 dernières utilisations RETAIL</div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Email</th><th>Article</th><th>Date</th></tr></thead>
+            <tbody id="tbl-uses-retail"><tr><td colspan="3" class="loading-text">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ajout manuel -->
+    <div class="form-card">
+      <h3>➕ Ajout manuel LPL Club</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Pensez à cliquer sur <strong>Actualiser BDD</strong> en haut à droite après l'ajout pour que les avantages soient actifs partout.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Email du client *</label>
+          <input type="email" id="add-email" placeholder="client@email.com">
+        </div>
+        <div class="form-group">
+          <label>Auteur de l'ajout *</label>
+          <input type="text" id="add-author" placeholder="Votre prénom">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Notes / Motif</label>
+        <textarea id="add-notes" placeholder="Ex: Influenceur, service client…"></textarea>
+      </div>
+      <button class="btn-navy" onclick="addMember()" id="add-btn">Valider l'adhésion</button>
+      <div class="alert alert-success" id="add-success"></div>
+      <div class="alert alert-error" id="add-error"></div>
+    </div>
+
+  </div><!-- /tab-lpl -->
+
+  <!-- ============================================================ REFERRAL TAB -->
+  <div id="tab-referral" class="tab-panel">
+
+    <!-- KPIs — Sections organisées -->
+    <div class="kpi-sections" id="ref-kpis">
+
+      <!-- IMPACT PROGRAMME -->
+      <div class="kpi-section">
+        <div class="kpi-section-header">
+          <span class="kpi-section-title">Impact programme</span>
+          <span class="kpi-section-desc">Filleuls recrutés, CA généré et parrains ayant activé leur code</span>
+        </div>
+        <div class="kpi-section-body kpi-section-body-3">
+          <div class="kpi-mini kpi-mini-total">
+            <div class="kpi-label">Total filleuls</div>
+            <div class="kpi-value" id="r-filleuls"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">all time</div>
+            <div class="kpi-trend-row" id="r-filleuls-trend">
+              <div class="kpi-trend-block">
+                <div class="kpi-trend-val kpi-skeleton" style="width:28px;height:16px"></div>
+                <div class="kpi-trend-unit">nouveaux /30j</div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-mini kpi-mini-web">
+            <div class="kpi-label">CA filleuls</div>
+            <div class="kpi-value" id="r-ca"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">depuis la date de parrainage</div>
+          </div>
+          <div class="kpi-mini kpi-mini-retail">
+            <div class="kpi-label">Parrains actifs</div>
+            <div class="kpi-value" id="r-parrains"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">codes ayant recruté au moins 1 filleul</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BUDGET PROGRAMME -->
+      <div class="kpi-section">
+        <div class="kpi-section-header">
+          <span class="kpi-section-title">Budget programme</span>
+          <span class="kpi-section-desc">Coût immédiat (discount filleul) + encours cagnotte parrain</span>
+        </div>
+        <div class="kpi-section-body kpi-section-body-3">
+          <div class="kpi-mini kpi-mini-total">
+            <div class="kpi-label">Discount filleul</div>
+            <div class="kpi-value" id="r-cost-filleul"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">10 € × total filleuls (coût acquisition)</div>
+          </div>
+          <div class="kpi-mini kpi-mini-web">
+            <div class="kpi-label">Cagnotte dépensée</div>
+            <div class="kpi-value" id="r-dep"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">codes KDO utilisés par les parrains</div>
+          </div>
+          <div class="kpi-mini kpi-mini-retail">
+            <div class="kpi-label">Cagnotte restante</div>
+            <div class="kpi-value" id="r-restante"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">encours — montant non encore dépensé</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÉTAT DES CODES -->
+      <div class="kpi-section">
+        <div class="kpi-section-header">
+          <span class="kpi-section-title">État des codes</span>
+          <span class="kpi-section-desc">Santé opérationnelle du parc de codes parrain LPL-</span>
+        </div>
+        <div class="kpi-section-body kpi-section-body-3">
+          <div class="kpi-mini kpi-mini-total">
+            <div class="kpi-label">Codes actifs</div>
+            <div class="kpi-value" id="r-actifs"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">statut ACTIVE</div>
+          </div>
+          <div class="kpi-mini kpi-mini-web">
+            <div class="kpi-label">Codes 5/5</div>
+            <div class="kpi-value" id="r-max"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub">quota max atteint</div>
+          </div>
+          <div class="kpi-mini kpi-mini-retail">
+            <div class="kpi-label">Codes bloqués</div>
+            <div class="kpi-value" id="r-blocked"><span class="kpi-skeleton"></span></div>
+            <div class="kpi-sub" style="color:var(--danger)">statut BLOCKED</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Parrainages par semaine -->
+    <div class="chart-card">
+      <h3>Parrainages par semaine — 10 dernières semaines</h3>
+      <div class="chart-wrap"><canvas id="chart-ref-weekly"></canvas></div>
+    </div>
+
+    <!-- Boutique + Statuts -->
+    <div class="chart-grid-2b">
+      <div class="chart-card" style="margin-bottom:0">
+        <h3>Validations par boutique (all time)</h3>
+        <div class="chart-wrap"><canvas id="chart-boutique"></canvas></div>
+      </div>
+      <div class="chart-card" style="margin-bottom:0">
+        <h3>Statut des codes</h3>
+        <div class="chart-wrap-sm"><canvas id="chart-status-pie"></canvas></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Top parrains + Derniers parrainages -->
+    <div class="live-grid">
+      <div class="table-card">
+        <div class="table-card-header">🏆 Top 20 Parrains</div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>#</th><th>Email</th><th>Filleuls</th><th>Statut</th></tr></thead>
+            <tbody id="tbl-top-parrains"><tr><td colspan="4" class="loading-text">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-card-header">⚡ 30 derniers parrainages</div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Code</th><th>Filleul</th><th>Canal</th><th>Date</th></tr></thead>
+            <tbody id="tbl-ref-recent"><tr><td colspan="4" class="loading-text">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-referral -->
+
+</div><!-- /content -->
+
+<div id="toast"></div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const charts = {};
+let lplLoaded = false;
+let refLoaded = false;
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'lpl' && !lplLoaded) loadLpl();
+  if (name === 'referral' && !refLoaded) loadReferral();
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  setTimeout(() => { t.className = ''; }, 3000);
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const fmt = n => n != null ? Number(n).toLocaleString('fr-FR') : '—';
+const fmtPct = n => n != null ? n + ' %' : '—';
+const fmtEur = n => n != null ? Number(n).toLocaleString('fr-FR', {style:'currency', currency:'EUR', minimumFractionDigits:0}) : '—';
+
+const SOURCE_COLORS = { WEB: '#3b82f6', RETAIL: '#10b981', MANUEL: '#f59e0b', WEB_ONLINE: '#3b82f6' };
+const CANAL_COLORS = { WEB: '#3b82f6', BOUTIQUE: '#8b5cf6' };
+const STATUS_COLORS = { ACTIVE: '#10b981', MAX_REACHED: '#f59e0b', BLOCKED_FRAUD: '#ef4444', BLOCKED: '#ef4444', BLOCKED_PUBLIC: '#f97316', ARCHIVED: '#9ca3af' };
+
+function sourceBadge(s) {
+  const map = { WEB: 'web', RETAIL: 'retail', MANUEL: 'manuel', BOUTIQUE: 'boutique' };
+  return `<span class="badge badge-${map[s] || 'web'}">${s}</span>`;
+}
+function statusBadge(s) {
+  const map = { ACTIVE: 'active', MAX_REACHED: 'max', BLOCKED_FRAUD: 'blocked', BLOCKED: 'blocked', BLOCKED_PUBLIC: 'blocked', ARCHIVED: 'archived' };
+  const labels = { ACTIVE: 'Actif', MAX_REACHED: 'Max (5/5)', BLOCKED_FRAUD: 'Fraude', BLOCKED: 'Bloqué', BLOCKED_PUBLIC: 'Public', ARCHIVED: 'Archivé' };
+  return `<span class="badge badge-${map[s] || 'archived'}">${labels[s] || s}</span>`;
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  return d.slice(0, 10);
+}
+
+// ─── TREND HELPER ────────────────────────────────────────────────────────────
+// Remplit un bloc .kpi-trend-row avec la valeur /7j et le badge WoW.
+// count7d : valeur sur les 7 derniers jours complets
+// prev7d  : valeur sur les 7 jours précédents
+// unit    : libellé sous la valeur (ex: "nouvelles /7j", "actifs /7j")
+function setTrend(id, count7d, prev7d, unit) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const delta = count7d - prev7d;
+  const cls   = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
+  const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
+  const sign  = delta > 0 ? '+' : '';
+  const wowLabel = prev7d === 0 && count7d === 0
+    ? '<span class="kpi-wow flat">→ aucune activité</span>'
+    : `<span class="kpi-wow ${cls}">${arrow} ${sign}${delta} vs S-1</span>`;
+  el.innerHTML = `
+    <div class="kpi-trend-block">
+      <div class="kpi-trend-val">${count7d}</div>
+      <div class="kpi-trend-unit">${unit}</div>
+    </div>
+    ${wowLabel}
+  `;
+}
+
+// Pivot rows → Chart.js datasets. dateField defaults to 'semaine' for weekly, pass 'jour' for daily.
+function pivotToDatasets(rows, keyField, valField, colorMap, dateField = 'semaine') {
+  const dates = [...new Set(rows.map(r => r[dateField]))].sort();
+  const keys = [...new Set(rows.map(r => r[keyField]))];
+  const datasets = keys.map(k => ({
+    label: k,
+    data: dates.map(d => { const m = rows.find(r => r[dateField] === d && r[keyField] === k); return m ? m[valField] : 0; }),
+    backgroundColor: colorMap[k] || '#94a3b8',
+    borderRadius: 4,
+  }));
+  return { labels: dates.map(d => d ? d.slice(5, 10) : d), datasets };
+}
+
+function makeChart(id, type, data, opts = {}) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, {
+    type,
+    data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } },
+      scales: type === 'bar' ? {
+        x: { stacked: opts.stacked || false, grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { stacked: opts.stacked || false, grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } },
+      } : undefined,
+      ...opts,
+    },
+  });
+}
+
+// ─── LPL CLUB ────────────────────────────────────────────────────────────────
+async function loadLpl() {
+  try {
+    const [kpis, daily, weekly, pie, uses, membersWeb, membersRetail, usesWeb, usesRetail] = await Promise.all([
+      fetch('/api/lpl/kpis').then(r => r.json()),
+      fetch('/api/lpl/daily-adhesions').then(r => r.json()),
+      fetch('/api/lpl/weekly-adhesions').then(r => r.json()),
+      fetch('/api/lpl/source-pie').then(r => r.json()),
+      fetch('/api/lpl/weekly-uses').then(r => r.json()),
+      fetch('/api/lpl/live-members-web').then(r => r.json()),
+      fetch('/api/lpl/live-members-retail').then(r => r.json()),
+      fetch('/api/lpl/live-uses-web').then(r => r.json()),
+      fetch('/api/lpl/live-uses-retail').then(r => r.json()),
+    ]);
+
+    // KPIs
+    if (!kpis.error) {
+      document.getElementById('k-total').textContent = fmt(kpis.total_active);
+      document.getElementById('k-web-active').textContent = fmt(kpis.web_active);
+      document.getElementById('k-retail-active').textContent = fmt(kpis.retail_active);
+      document.getElementById('k-util').textContent = fmtPct(kpis.tx_utilisation);
+      document.getElementById('k-util-web').textContent = fmtPct(kpis.tx_web_util);
+      document.getElementById('k-util-retail').textContent = fmtPct(kpis.tx_retail_util);
+      document.getElementById('k-web10').textContent = fmtPct(kpis.tx_web_10w);
+      document.getElementById('k-web7').textContent = fmtPct(kpis.tx_web_7d);
+      document.getElementById('k-ret10').textContent = fmtPct(kpis.tx_retail_10w);
+      document.getElementById('k-ret7').textContent = fmtPct(kpis.tx_retail_7d);
+
+      // Tendances adhésions
+      const newTotal7d   = (kpis.new_web_7d    || 0) + (kpis.new_retail_7d    || 0);
+      const newTotalPrev = (kpis.new_web_prev7  || 0) + (kpis.new_retail_prev7 || 0);
+      setTrend('k-total-adh-trend',  newTotal7d,            newTotalPrev,          'nouvelles /7j');
+      setTrend('k-web-adh-trend',    kpis.new_web_7d    || 0, kpis.new_web_prev7  || 0, 'nouvelles /7j');
+      setTrend('k-retail-adh-trend', kpis.new_retail_7d || 0, kpis.new_retail_prev7|| 0, 'nouvelles /7j');
+
+      // Tendances utilisations (utilisateurs uniques actifs cette semaine)
+      const useTotal7d   = (kpis.use_web_7d    || 0) + (kpis.use_retail_7d    || 0);
+      const useTotalPrev = (kpis.use_web_prev7  || 0) + (kpis.use_retail_prev7 || 0);
+      setTrend('k-util-total-trend',  useTotal7d,           useTotalPrev,          'actifs /7j');
+      setTrend('k-util-web-trend',    kpis.use_web_7d    || 0, kpis.use_web_prev7  || 0, 'actifs /7j');
+      setTrend('k-util-retail-trend', kpis.use_retail_7d || 0, kpis.use_retail_prev7|| 0, 'actifs /7j');
+    }
+
+    // Daily adhesions stacked bar
+    if (!daily.error && daily.length) {
+      const d = pivotToDatasets(daily, 'source', 'count', SOURCE_COLORS, 'jour');
+      makeChart('chart-adhesions-daily', 'bar', d, { stacked: true });
+    }
+
+    // Weekly adhesions stacked bar
+    if (!weekly.error && weekly.length) {
+      const d = pivotToDatasets(weekly, 'source', 'count', SOURCE_COLORS);
+      makeChart('chart-adhesions', 'bar', d, { stacked: true });
+    }
+
+    // Pie source
+    if (!pie.error && pie.length) {
+      makeChart('chart-pie-source', 'doughnut', {
+        labels: pie.map(r => r.source),
+        datasets: [{ data: pie.map(r => r.count), backgroundColor: pie.map(r => SOURCE_COLORS[r.source] || '#94a3b8'), borderWidth: 2 }],
+      });
+    }
+
+    // Uses chart
+    if (!uses.error && uses.length) {
+      const d = pivotToDatasets(uses, 'canal', 'uses', CANAL_COLORS);
+      makeChart('chart-uses', 'bar', d, { stacked: false });
+    }
+
+    // Adhésions WEB
+    const tbMW = document.getElementById('tbl-members-web');
+    if (membersWeb.error) { tbMW.innerHTML = `<tr><td colspan="2" class="loading-text">Erreur : ${membersWeb.error}</td></tr>`; }
+    else if (!membersWeb.length) { tbMW.innerHTML = '<tr><td colspan="2" class="loading-text">Aucune donnée</td></tr>'; }
+    else { tbMW.innerHTML = membersWeb.map(r => `<tr><td>${r.email}</td><td>${fmtDate(r.date)}</td></tr>`).join(''); }
+
+    // Adhésions RETAIL
+    const tbMR = document.getElementById('tbl-members-retail');
+    if (membersRetail.error) { tbMR.innerHTML = `<tr><td colspan="2" class="loading-text">Erreur : ${membersRetail.error}</td></tr>`; }
+    else if (!membersRetail.length) { tbMR.innerHTML = '<tr><td colspan="2" class="loading-text">Aucune donnée</td></tr>'; }
+    else { tbMR.innerHTML = membersRetail.map(r => `<tr><td>${r.email}</td><td>${fmtDate(r.date)}</td></tr>`).join(''); }
+
+    // Utilisations WEB
+    const tbUW = document.getElementById('tbl-uses-web');
+    if (usesWeb.error) { tbUW.innerHTML = `<tr><td colspan="3" class="loading-text">Erreur : ${usesWeb.error}</td></tr>`; }
+    else if (!usesWeb.length) { tbUW.innerHTML = '<tr><td colspan="3" class="loading-text">Aucune donnée</td></tr>'; }
+    else { tbUW.innerHTML = usesWeb.map(r => `<tr><td>${r.email}</td><td><code style="font-size:11px;background:#f3f4f6;padding:2px 5px;border-radius:4px">${r.preuve || '—'}</code></td><td>${fmtDate(r.date)}</td></tr>`).join(''); }
+
+    // Utilisations RETAIL
+    const tbUR = document.getElementById('tbl-uses-retail');
+    if (usesRetail.error) { tbUR.innerHTML = `<tr><td colspan="3" class="loading-text">Erreur : ${usesRetail.error}</td></tr>`; }
+    else if (!usesRetail.length) { tbUR.innerHTML = '<tr><td colspan="3" class="loading-text">Aucune donnée</td></tr>'; }
+    else { tbUR.innerHTML = usesRetail.map(r => `<tr><td>${r.email}</td><td><code style="font-size:11px;background:#f3f4f6;padding:2px 5px;border-radius:4px">${r.preuve || '—'}</code></td><td>${fmtDate(r.date)}</td></tr>`).join(''); }
+
+    lplLoaded = true;
+  } catch (e) {
+    toast('Erreur chargement LPL Club : ' + e.message, 'error');
+  } finally {
+    // Masque l'overlay quoi qu'il arrive
+    const loader = document.getElementById('page-loader');
+    loader.classList.add('hidden');
+    setTimeout(() => { loader.style.display = 'none'; }, 350);
+  }
+}
+
+// ─── REFERRAL ────────────────────────────────────────────────────────────────
+async function loadReferral() {
+  try {
+    const [kpis, weekly, boutique, statuses, topParrains, recent] = await Promise.all([
+      fetch('/api/referral/kpis').then(r => r.json()),
+      fetch('/api/referral/weekly').then(r => r.json()),
+      fetch('/api/referral/by-boutique').then(r => r.json()),
+      fetch('/api/referral/status-distribution').then(r => r.json()),
+      fetch('/api/referral/top-parrains').then(r => r.json()),
+      fetch('/api/referral/recent-redemptions').then(r => r.json()),
+    ]);
+
+    // KPIs
+    if (!kpis.error) {
+      // Impact
+      document.getElementById('r-filleuls').textContent = fmt(kpis.total_filleuls);
+      document.getElementById('r-ca').textContent = fmtEur(kpis.ca_filleuls);
+      document.getElementById('r-parrains').textContent = fmt(kpis.parrains_actifs);
+      setTrend('r-filleuls-trend', kpis.filleuls_30j, kpis.filleuls_prev30j, 'nouveaux /30j');
+      // Budget
+      const costFilleul = kpis.total_filleuls * 10;
+      const restante = kpis.cagnotte_generee - kpis.cagnotte_depensee;
+      document.getElementById('r-cost-filleul').textContent = fmtEur(costFilleul);
+      document.getElementById('r-dep').textContent = fmtEur(kpis.cagnotte_depensee);
+      document.getElementById('r-restante').textContent = fmtEur(restante);
+      // État codes
+      document.getElementById('r-actifs').textContent = fmt(kpis.codes_actifs);
+      document.getElementById('r-max').textContent = fmt(kpis.codes_max_reached);
+      document.getElementById('r-blocked').textContent = fmt(kpis.codes_bloques);
+    }
+
+    // Weekly bar
+    if (!weekly.error && weekly.length) {
+      makeChart('chart-ref-weekly', 'bar', {
+        labels: weekly.map(r => r.semaine ? r.semaine.slice(5, 10) : r.semaine),
+        datasets: [{ label: 'Parrainages', data: weekly.map(r => r.parrainages), backgroundColor: '#3b82f6', borderRadius: 4 }],
+      });
+    }
+
+    // Boutique horizontal bar
+    if (!boutique.error && boutique.length) {
+      makeChart('chart-boutique', 'bar', {
+        labels: boutique.map(r => r.boutique),
+        datasets: [{ label: 'Validations', data: boutique.map(r => r.count), backgroundColor: '#8b5cf6', borderRadius: 4 }],
+      }, {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } },
+      });
+    }
+
+    // Status pie
+    if (!statuses.error && statuses.length) {
+      makeChart('chart-status-pie', 'doughnut', {
+        labels: statuses.map(r => r.status),
+        datasets: [{ data: statuses.map(r => r.count), backgroundColor: statuses.map(r => STATUS_COLORS[r.status] || '#94a3b8'), borderWidth: 2 }],
+      });
+    }
+
+    // Top parrains
+    if (!topParrains.error) {
+      const tbody = document.getElementById('tbl-top-parrains');
+      if (topParrains.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="loading-text">Aucune donnée</td></tr>'; }
+      else {
+        tbody.innerHTML = topParrains.map((r, i) =>
+          `<tr><td>${i+1}</td><td>${r.email}</td><td><strong>${r.usages}</strong></td><td>${statusBadge(r.statut)}</td></tr>`
+        ).join('');
+      }
+    }
+
+    // Recent redemptions
+    if (!recent.error) {
+      const tbody = document.getElementById('tbl-ref-recent');
+      if (recent.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="loading-text">Aucune donnée</td></tr>'; }
+      else {
+        tbody.innerHTML = recent.map(r =>
+          `<tr>
+            <td><code style="font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px">${r.code}</code></td>
+            <td>${r.filleul}</td>
+            <td>${r.boutique ? sourceBadge(r.boutique.startsWith('SHOPIFY') ? 'WEB' : 'BOUTIQUE') : '—'}</td>
+            <td>${fmtDate(r.date)}</td>
+          </tr>`
+        ).join('');
+      }
+    }
+
+    refLoaded = true;
+  } catch (e) {
+    toast('Erreur chargement Parrainage : ' + e.message, 'error');
+  }
+}
+
+// ─── ADD MEMBER ──────────────────────────────────────────────────────────────
+async function addMember() {
+  const email = document.getElementById('add-email').value.trim();
+  const author = document.getElementById('add-author').value.trim();
+  const notes = document.getElementById('add-notes').value.trim();
+  const btn = document.getElementById('add-btn');
+  const ok = document.getElementById('add-success');
+  const err = document.getElementById('add-error');
+
+  ok.style.display = 'none'; err.style.display = 'none';
+
+  if (!email || !author) { err.textContent = 'Email et auteur sont obligatoires.'; err.style.display = 'block'; return; }
+
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Validation…';
+
+  try {
+    const res = await fetch('/api/lpl/add-member', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, added_by: author, notes }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      ok.textContent = `✅ ${email} ajouté avec succès. Avantages valables jusqu'au ${data.expiry}.`;
+      ok.style.display = 'block';
+      document.getElementById('add-email').value = '';
+      document.getElementById('add-author').value = '';
+      document.getElementById('add-notes').value = '';
+      lplLoaded = false; // force reload on next view
+    } else {
+      err.textContent = data.error || 'Erreur inconnue';
+      err.style.display = 'block';
+    }
+  } catch (e) {
+    err.textContent = 'Erreur réseau : ' + e.message;
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.innerHTML = 'Valider l\'adhésion';
+  }
+}
+
+// ─── ETL ─────────────────────────────────────────────────────────────────────
+async function runEtl() {
+  if (!confirm('Relancer l\'ETL BigQuery ?\n\nCela recalcule toute la table dim_unified_customers (environ 30 secondes).')) return;
+  const btn = document.getElementById('etl-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>ETL en cours…';
+  try {
+    const res = await fetch('/api/lpl/run-etl', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      toast('✅ BDD mise à jour avec succès !', 'success');
+      lplLoaded = false; refLoaded = false;
+      if (document.getElementById('tab-lpl').classList.contains('active')) { loadLpl(); }
+    } else {
+      toast('Erreur ETL : ' + (data.error || ''), 'error');
+    }
+  } catch (e) {
+    toast('Erreur réseau : ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.innerHTML = '🔄 Actualiser BDD';
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadLpl();
+</script>
+</body>
+</html>

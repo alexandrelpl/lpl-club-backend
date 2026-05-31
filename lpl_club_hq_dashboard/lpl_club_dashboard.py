@@ -154,9 +154,23 @@ with col_btn:
                 SELECT LOWER(email) AS email, NULL AS phone FROM `{PROJECT_ID}.shopify_data_eu.manual_lpl_club_members` WHERE email IS NOT NULL AND email != ''
             ),
             QualifyingOrders AS (
-                SELECT LOWER(email) AS email, DATE(order_date) AS qualifying_date, 'WEB' AS source FROM `{PROJECT_ID}.shopify_data_eu.custom_transactions_history` WHERE LOWER(shipping_method) LIKE '%lpl club%' 
+                -- WEB : ancien système (shipping_method)
+                SELECT LOWER(t.email) AS email, DATE(t.order_date) AS qualifying_date, 'WEB' AS source
+                FROM `{PROJECT_ID}.shopify_data_eu.custom_transactions_history` t
+                WHERE LOWER(t.shipping_method) LIKE '%lpl club%'
                 UNION ALL
-                SELECT LOWER(customer_email) AS email, CAST(invoice_creation_datetime AS DATE) AS qualifying_date, 'RETAIL' AS source FROM `stable-splicer-294813.dwh_datasource_sales.transaction_details_visits` WHERE UPPER(CAST(lplclub2026 AS STRING)) IN ('TRUE', '1', 'OUI', 'YES')
+                -- WEB : nouveau système (produit Adhésion LPL Club — depuis mai 2026)
+                SELECT LOWER(t.email) AS email, DATE(p.order_date) AS qualifying_date, 'WEB' AS source
+                FROM `{PROJECT_ID}.shopify_data_eu.transactions_products_2020` p
+                JOIN `{PROJECT_ID}.shopify_data_eu.custom_transactions_history` t
+                  ON t.client_id = p.client_id AND DATE(t.order_date) = DATE(p.order_date)
+                WHERE LOWER(p.product_title) = 'adhésion lpl club'
+                UNION ALL
+                -- RETAIL : filtre >= 2026-03-20 pour exclure le backfill Dacker fantôme
+                SELECT LOWER(customer_email) AS email, CAST(invoice_creation_datetime AS DATE) AS qualifying_date, 'RETAIL' AS source
+                FROM `stable-splicer-294813.dwh_datasource_sales.transaction_details_visits`
+                WHERE UPPER(CAST(lplclub2026 AS STRING)) IN ('TRUE', '1', 'OUI', 'YES')
+                  AND CAST(invoice_creation_datetime AS DATE) >= '2026-03-20'
                 UNION ALL
                 SELECT LOWER(email) AS email, DATE(added_at) AS qualifying_date, 'MANUEL' AS source FROM `{PROJECT_ID}.shopify_data_eu.manual_lpl_club_members`
             ),

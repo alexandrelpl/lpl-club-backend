@@ -1,8 +1,9 @@
 import os
+import time
 import requests
 import re
 import toml
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from flask import Flask, request, jsonify
 from google.cloud import bigquery
 
@@ -78,6 +79,52 @@ def trigger_klaviyo_update(owner_email, current_lpl_usage, max_usage, bq_client)
         else: print(f"❌ Erreur Klaviyo API : {response.text}", flush=True)
     except Exception as e: print(f"Erreur critique Klaviyo: {e}", flush=True)
 
+def push_klaviyo_membership(email, expiry):
+    """
+    Met à jour immédiatement le profil Klaviyo avec is_lpl_club=True et lpl_club_expiry_date.
+    Appelé au moment de l'achat pour que le flow post-achat évalue correctement le split.
+    """
+    if not email or not KLAVIYO_API_KEY:
+        return
+    try:
+        headers = {
+            "Authorization": f"Klaviyo-API-Key {KLAVIYO_API_KEY}",
+            "accept": "application/json",
+            "revision": "2024-02-15",
+            "content-type": "application/json"
+        }
+        properties = {"is_lpl_club": True, "lpl_club_expiry_date": expiry}
+
+        # Cherche le profil existant
+        r = requests.get(
+            f"https://a.klaviyo.com/api/profiles/?filter=equals(email,\"{email}\")",
+            headers=headers, timeout=5
+        )
+        if r.status_code == 429:
+            time.sleep(2)
+            r = requests.get(
+                f"https://a.klaviyo.com/api/profiles/?filter=equals(email,\"{email}\")",
+                headers=headers, timeout=5
+            )
+
+        if r.status_code == 200 and r.json().get("data"):
+            profile_id = r.json()["data"][0]["id"]
+            requests.patch(
+                f"https://a.klaviyo.com/api/profiles/{profile_id}/",
+                json={"data": {"type": "profile", "id": profile_id, "attributes": {"properties": properties}}},
+                headers=headers, timeout=5
+            )
+            print(f"✅ Klaviyo membership mis à jour : {email}", flush=True)
+        else:
+            requests.post(
+                "https://a.klaviyo.com/api/profiles/",
+                json={"data": {"type": "profile", "attributes": {"email": email, "properties": properties}}},
+                headers=headers, timeout=5
+            )
+            print(f"✨ Klaviyo membership créé : {email}", flush=True)
+    except Exception as e:
+        print(f"⚠️ Klaviyo membership push échoué ({email}): {e}", flush=True)
+
 def write_lpl_club_metafields(customer_gid):
     """Écrit lpl_club.active=true et lpl_club.expiry_date=aujourd'hui+1an sur le customer Shopify."""
     expiry = (date.today() + timedelta(days=365)).isoformat()
@@ -103,10 +150,47 @@ def write_lpl_club_metafields(customer_gid):
         return True
     return False
 
+def has_lpl_club_discount(data):
+    """Détecte le discount automatique 'LPL Club -10%' dans une commande REST Shopify."""
+    for da in data.get("discount_applications", []):
+        if da.get("type") == "automatic" and "LPL Club -10" in (da.get("title") or ""):
+            return True
+    return False
+
+
+def log_lpl_club_use_to_bq(email, order_id, created_at_str):
+    """Log une utilisation du discount LPL Club -10% dans BigQuery."""
+    try:
+        safe_ts = created_at_str.replace("T", " ").replace("Z", " UTC")
+        q = f"""
+        INSERT INTO `{PROJECT_ID}.shopify_data_eu.lpl_club_web_uses`
+        (email, order_id, created_at)
+        VALUES ('{email}', '{order_id}', TIMESTAMP('{safe_ts}'))
+        """
+        client.query(q).result()
+        print(f"✅ BQ log LPL Club USE : {email} order {order_id}", flush=True)
+    except Exception as e:
+        print(f"⚠️ BQ log use échoué ({email}): {e}", flush=True)
+
+
+def log_lpl_club_to_bq(customer_email, order_id):
+    """Log l'adhésion LPL Club dans BigQuery pour le dashboard en temps réel."""
+    try:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        q = f"""
+        INSERT INTO `{PROJECT_ID}.shopify_data_eu.lpl_club_web_orders`
+        (email, order_id, created_at)
+        VALUES ('{customer_email}', '{order_id}', TIMESTAMP('{now}'))
+        """
+        client.query(q).result()
+        print(f"✅ BQ log LPL Club : {customer_email} order {order_id}", flush=True)
+    except Exception as e:
+        print(f"⚠️ BQ log échoué ({customer_email}): {e}", flush=True)
+
 def handle_lpl_club_membership(data):
     """
     Détecte le produit Adhésion LPL Club dans les line_items de la commande.
-    Si trouvé : écrit les metafields Shopify immédiatement.
+    Si trouvé : écrit les metafields Shopify + log BQ + push Klaviyo immédiatement.
     Retourne True si une adhésion a été traitée.
     """
     line_items = data.get("line_items", [])
@@ -126,14 +210,60 @@ def handle_lpl_club_membership(data):
         return False
 
     customer_gid = f"gid://shopify/Customer/{customer_id}"
-    print(f"🎯 Adhésion LPL Club détectée pour {customer_email} (order {data.get('id')})", flush=True)
-    return write_lpl_club_metafields(customer_gid)
+    order_id = str(data.get("id", ""))
+    print(f"🎯 Adhésion LPL Club détectée pour {customer_email} (order {order_id})", flush=True)
+    expiry = (date.today() + timedelta(days=365)).isoformat()
+    result = write_lpl_club_metafields(customer_gid)
+    push_klaviyo_membership(customer_email.lower().strip(), expiry)
+    log_lpl_club_to_bq(customer_email.lower().strip(), order_id)
+    return result
 
 def block_referral_code(code, rule_id, reason):
     print(f"⛔ BLOCAGE DU CODE {code} : {reason}", flush=True)
     q_block = f"UPDATE `{PROJECT_ID}.shopify_data_eu.referral_codes` SET status = 'BLOCKED_FRAUD' WHERE code = @code"
     client.query(q_block, job_config=bigquery.QueryJobConfig(query_parameters=[bigquery.ScalarQueryParameter("code", "STRING", code)])).result()
     delete_shopify_discount(rule_id)
+
+@app.route('/check-membership', methods=['GET'])
+def check_membership():
+    """
+    Vérifie si un client est membre LPL Club actif.
+    Appelé par la Checkout UI Extension pour les clients non connectés.
+    GET /check-membership?email=...
+    Retourne { active: bool, expiry_date: str|null }
+    """
+    email = request.args.get('email', '').lower().strip()
+    if not email or '@' not in email:
+        return jsonify({'active': False, 'expiry_date': None})
+
+    query = """
+    query($q: String!) {
+      customers(first: 1, query: $q) {
+        nodes {
+          activeField: metafield(namespace: "lpl_club", key: "active") { value }
+          expiryField: metafield(namespace: "lpl_club", key: "expiry_date") { value }
+        }
+      }
+    }
+    """
+    result = run_shopify_graphql(query, {'q': f'email:"{email}"'})
+    if not result:
+        return jsonify({'active': False, 'expiry_date': None})
+
+    nodes = result.get('data', {}).get('customers', {}).get('nodes', [])
+    if not nodes:
+        return jsonify({'active': False, 'expiry_date': None})
+
+    customer = nodes[0]
+    active_field = customer.get('activeField')
+    expiry_field = customer.get('expiryField')
+    active = active_field.get('value') == 'true' if active_field else False
+    expiry = expiry_field.get('value') if expiry_field else None
+
+    response = jsonify({'active': active, 'expiry_date': expiry})
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
+
 
 @app.route('/shopify-webhook', methods=['POST'])
 def handle_webhook():
@@ -144,7 +274,13 @@ def handle_webhook():
     customer_phone = normalize_phone(raw_phone)
 
     # --- Détection adhésion LPL Club ---
-    handle_lpl_club_membership(data)
+    is_adhesion = handle_lpl_club_membership(data)
+
+    # --- Détection utilisation discount LPL Club -10% (discount automatique) ---
+    # On ne log pas si c'est la commande d'adhésion elle-même
+    if not is_adhesion and has_lpl_club_discount(data):
+        created_at_str = data.get("created_at", "")
+        log_lpl_club_use_to_bq(customer_email, order_id, created_at_str)
 
     discount_codes = []
     if 'discount_applications' in data: discount_codes = [app.get('code', '').upper() for app in data['discount_applications'] if app.get('type') == 'discount_code']

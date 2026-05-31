@@ -1,12 +1,10 @@
-streamlit>=1.30.0
 google-cloud-bigquery
-google-generativeai
-watchdog
 pyarrow
 pandas
 db-dtypes
 flask-cors
 Flask
+gunicorn
 requests
 toml
 curl_cffi==0.5.10
