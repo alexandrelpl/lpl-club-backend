@@ -105,6 +105,35 @@
   .tab-btn:hover:not(.active) .tab-btn-title { color: var(--navy); }
   .tab-btn:hover:not(.active) .tab-btn-desc  { color: var(--navy-light); }
 
+  /* MOBILE */
+  @media (max-width: 640px) {
+    /* Header : masquer le titre texte, garder logo + boutons */
+    .header { padding: 0 14px; }
+    .header-title { display: none; }
+    .header-user  { display: none; }
+    .header-left  { gap: 10px; }
+    .header-right { gap: 8px; }
+    .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+    /* Tabs : les deux boutons se partagent la largeur dispo */
+    .tab-bar {
+      padding: 10px 14px;
+      gap: 8px;
+    }
+    .tab-btn {
+      flex: 1;
+      min-width: 0;
+      gap: 8px;
+      padding: 8px 10px;
+    }
+    .tab-btn-icon { font-size: 18px; }
+    .tab-btn-title { font-size: 12px; }
+    .tab-btn-desc  { font-size: 10px; }
+
+    /* Content : padding réduit */
+    .content { padding: 14px; }
+  }
+
   /* CONTENT */
   .content { padding: 24px; max-width: 1400px; margin: 0 auto; }
   .tab-panel { display: none; }
