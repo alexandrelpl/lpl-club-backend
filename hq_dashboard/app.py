@@ -672,6 +672,118 @@ def lpl_live_uses_retail():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/lpl/performance-cos")
+@login_required
+def lpl_performance_cos():
+    """
+    Adoption rate web : nouvelles adhésions / commandes web par période (J-1, 7j, 30j).
+    ONLINE uniquement — custom_transactions_history + lpl_club_web_orders.
+    """
+    q = f"""
+    WITH
+    all_web_adh AS (
+        SELECT LOWER(email) AS email, DATE(created_at) AS adh_date
+        FROM `{PROJECT_ID}.shopify_data_eu.lpl_club_web_orders`
+        UNION ALL
+        SELECT LOWER(email) AS email, DATE(order_date) AS adh_date
+        FROM `{PROJECT_ID}.shopify_data_eu.custom_transactions_history`
+        WHERE LOWER(shipping_method) LIKE '%lpl club%' AND {CTH_VALID}
+    ),
+    web_orders AS (
+        SELECT
+            COUNTIF(DATE(order_date) = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))                                                       AS orders_j1,
+            COUNTIF(DATE(order_date) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+                    AND DATE(order_date) < CURRENT_DATE())                                                                              AS orders_7j,
+            COUNTIF(DATE(order_date) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+                    AND DATE(order_date) < CURRENT_DATE())                                                                              AS orders_30j
+        FROM `{PROJECT_ID}.shopify_data_eu.custom_transactions_history`
+        WHERE {CTH_VALID}
+    ),
+    new_adh AS (
+        SELECT
+            COUNT(DISTINCT CASE WHEN adh_date = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) THEN email END)                               AS adh_j1,
+            COUNT(DISTINCT CASE WHEN adh_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+                                 AND adh_date < CURRENT_DATE() THEN email END)                                                          AS adh_7j,
+            COUNT(DISTINCT CASE WHEN adh_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+                                 AND adh_date < CURRENT_DATE() THEN email END)                                                          AS adh_30j,
+            COUNT(DISTINCT email)                                                                                                       AS adh_total
+        FROM all_web_adh
+    )
+    SELECT o.*, n.* FROM web_orders o CROSS JOIN new_adh n
+    """
+    try:
+        rows = run_bq(q)
+        r = rows[0]
+        def rate(adh, orders):
+            return round(adh / orders * 100, 1) if orders else 0
+        return jsonify({
+            "adh_j1":    int(r.adh_j1 or 0),   "orders_j1":  int(r.orders_j1 or 0),  "rate_j1":  rate(r.adh_j1 or 0,  r.orders_j1 or 0),
+            "adh_7j":    int(r.adh_7j or 0),   "orders_7j":  int(r.orders_7j or 0),  "rate_7j":  rate(r.adh_7j or 0,  r.orders_7j or 0),
+            "adh_30j":   int(r.adh_30j or 0),  "orders_30j": int(r.orders_30j or 0), "rate_30j": rate(r.adh_30j or 0, r.orders_30j or 0),
+            "adh_total": int(r.adh_total or 0),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/lpl/club-vs-noclub")
+@login_required
+def lpl_club_vs_noclub():
+    """
+    Comparaison réachat LPL Club vs Sans Club — ONLINE uniquement (custom_transactions_history).
+    Club = clients ayant une adhésion web (lpl_club_web_orders ou shipping_method LPL Club).
+    Métriques : nb clients, commandes/client, taux réachat (≥2 commandes), taux 3+ commandes,
+                CA moyen/client, panier moyen.
+    """
+    q = f"""
+    WITH
+    club_web AS (
+        SELECT DISTINCT LOWER(email) AS email
+        FROM (
+            SELECT email FROM `{PROJECT_ID}.shopify_data_eu.lpl_club_web_orders`
+            UNION ALL
+            SELECT email FROM `{PROJECT_ID}.shopify_data_eu.custom_transactions_history`
+            WHERE LOWER(shipping_method) LIKE '%lpl club%' AND {CTH_VALID}
+        )
+    ),
+    web_stats AS (
+        SELECT
+            LOWER(email) AS email,
+            COUNT(*)         AS nb_commandes,
+            SUM(net_sales)   AS ca_total,
+            AVG(net_sales)   AS panier_moy
+        FROM `{PROJECT_ID}.shopify_data_eu.custom_transactions_history`
+        WHERE {CTH_VALID}
+        GROUP BY email
+    )
+    SELECT
+        CASE WHEN c.email IS NOT NULL THEN 'LPL Club' ELSE 'Sans Club' END AS segment,
+        COUNT(*)                                                            AS nb_clients,
+        ROUND(AVG(w.nb_commandes), 2)                                      AS commandes_moy,
+        ROUND(COUNTIF(w.nb_commandes >= 2) / COUNT(*) * 100, 1)           AS taux_reachat,
+        ROUND(COUNTIF(w.nb_commandes >= 3) / COUNT(*) * 100, 1)           AS taux_3plus,
+        ROUND(AVG(w.ca_total), 0)                                          AS ca_moy_client,
+        ROUND(AVG(w.panier_moy), 0)                                        AS panier_moy
+    FROM web_stats w
+    LEFT JOIN club_web c ON w.email = c.email
+    GROUP BY segment
+    ORDER BY segment DESC
+    """
+    try:
+        rows = run_bq(q)
+        return jsonify([{
+            "segment":      r.segment,
+            "nb_clients":   int(r.nb_clients),
+            "commandes_moy": float(r.commandes_moy),
+            "taux_reachat": float(r.taux_reachat),
+            "taux_3plus":   float(r.taux_3plus),
+            "ca_moy_client":float(r.ca_moy_client),
+            "panier_moy":   float(r.panier_moy),
+        } for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/lpl/live-uses")
 @login_required
 def lpl_live_uses():

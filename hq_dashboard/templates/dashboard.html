@@ -571,6 +571,49 @@
 
     </div>
 
+    <!-- ── Performance & Adoption Web ─────────────────────────────────── -->
+    <div class="table-card" style="margin-bottom:20px">
+      <div class="table-card-header">🌐 Performance — Adoption Web (Online uniquement)</div>
+      <div class="table-scroll">
+        <table id="tbl-perf-cos">
+          <thead>
+            <tr>
+              <th>Période</th>
+              <th>Nouvelles adhésions</th>
+              <th>Commandes web</th>
+              <th>Taux d'adoption</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" class="loading-text">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── LPL Club vs Sans Club ──────────────────────────────────────── -->
+    <div class="table-card" style="margin-bottom:20px">
+      <div class="table-card-header">🔬 LPL Club vs Sans Club — Réachat Online uniquement</div>
+      <div class="table-scroll">
+        <table id="tbl-club-vs">
+          <thead>
+            <tr>
+              <th>Segment</th>
+              <th>Clients</th>
+              <th>Commandes / client</th>
+              <th>Taux réachat (2+)</th>
+              <th>Taux 3+ achats</th>
+              <th>CA moyen / client</th>
+              <th>Panier moyen</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="7" class="loading-text">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Adhésions par jour (full width) -->
     <div class="chart-card">
       <h3>Adhésions par jour — 14 derniers jours</h3>
@@ -909,7 +952,7 @@ function makeChart(id, type, data, opts = {}) {
 // ─── LPL CLUB ────────────────────────────────────────────────────────────────
 async function loadLpl() {
   try {
-    const [kpis, daily, weekly, pie, uses, membersWeb, membersRetail, usesWeb, usesRetail] = await Promise.all([
+    const [kpis, daily, weekly, pie, uses, membersWeb, membersRetail, usesWeb, usesRetail, perfCos, clubVs] = await Promise.all([
       fetch('/api/lpl/kpis').then(r => r.json()),
       fetch('/api/lpl/daily-adhesions').then(r => r.json()),
       fetch('/api/lpl/weekly-adhesions').then(r => r.json()),
@@ -919,6 +962,8 @@ async function loadLpl() {
       fetch('/api/lpl/live-members-retail').then(r => r.json()),
       fetch('/api/lpl/live-uses-web').then(r => r.json()),
       fetch('/api/lpl/live-uses-retail').then(r => r.json()),
+      fetch('/api/lpl/performance-cos').then(r => r.json()),
+      fetch('/api/lpl/club-vs-noclub').then(r => r.json()),
     ]);
 
     // KPIs
@@ -998,6 +1043,53 @@ async function loadLpl() {
     if (usesRetail.error) { tbUR.innerHTML = `<tr><td colspan="3" class="loading-text">Erreur : ${usesRetail.error}</td></tr>`; }
     else if (!usesRetail.length) { tbUR.innerHTML = '<tr><td colspan="3" class="loading-text">Aucune donnée</td></tr>'; }
     else { tbUR.innerHTML = usesRetail.map(r => `<tr><td>${r.email}</td><td><code style="font-size:11px;background:#f3f4f6;padding:2px 5px;border-radius:4px">${r.preuve || '—'}</code></td><td>${fmtDate(r.date)}</td></tr>`).join(''); }
+
+    // ── Performance & Adoption Web ──────────────────────────────────────
+    const tbPerf = document.getElementById('tbl-perf-cos').querySelector('tbody');
+    if (perfCos.error) {
+      tbPerf.innerHTML = `<tr><td colspan="4" class="loading-text">Erreur : ${perfCos.error}</td></tr>`;
+    } else {
+      const rows_perf = [
+        { label: 'Hier (J-1)',        adh: perfCos.adh_j1,   orders: perfCos.orders_j1,  rate: perfCos.rate_j1  },
+        { label: '7 derniers jours',  adh: perfCos.adh_7j,   orders: perfCos.orders_7j,  rate: perfCos.rate_7j  },
+        { label: '30 derniers jours', adh: perfCos.adh_30j,  orders: perfCos.orders_30j, rate: perfCos.rate_30j },
+        { label: 'Total (all time)',  adh: perfCos.adh_total, orders: '—',                rate: '—'              },
+      ];
+      tbPerf.innerHTML = rows_perf.map(r => {
+        const rateCell = r.rate === '—' ? '—' : `<strong style="color:var(--navy)">${r.rate} %</strong>`;
+        return `<tr>
+          <td style="font-weight:600">${r.label}</td>
+          <td>${fmt(r.adh)}</td>
+          <td>${r.orders === '—' ? '—' : fmt(r.orders)}</td>
+          <td>${rateCell}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── LPL Club vs Sans Club ────────────────────────────────────────────
+    const tbClubVs = document.getElementById('tbl-club-vs').querySelector('tbody');
+    if (!Array.isArray(clubVs) || clubVs.error) {
+      tbClubVs.innerHTML = `<tr><td colspan="7" class="loading-text">Erreur chargement</td></tr>`;
+    } else if (!clubVs.length) {
+      tbClubVs.innerHTML = `<tr><td colspan="7" class="loading-text">Aucune donnée</td></tr>`;
+    } else {
+      tbClubVs.innerHTML = clubVs.map(r => {
+        const isClub = r.segment === 'LPL Club';
+        const rowStyle = isClub ? 'background:#f0f6ff' : '';
+        const segCell = isClub
+          ? `<span class="badge badge-web">LPL Club</span>`
+          : `<span class="badge" style="background:#f3f4f6;color:#6b7280">Sans Club</span>`;
+        return `<tr style="${rowStyle}">
+          <td>${segCell}</td>
+          <td>${fmt(r.nb_clients)}</td>
+          <td>${r.commandes_moy.toFixed(2)}</td>
+          <td><strong style="color:${isClub ? 'var(--navy)' : 'inherit'}">${r.taux_reachat} %</strong></td>
+          <td>${r.taux_3plus} %</td>
+          <td>${fmtEur(r.ca_moy_client)}</td>
+          <td>${fmtEur(r.panier_moy)}</td>
+        </tr>`;
+      }).join('');
+    }
 
     lplLoaded = true;
   } catch (e) {
