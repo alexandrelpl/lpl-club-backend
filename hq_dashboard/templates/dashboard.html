@@ -593,7 +593,7 @@
 
     <!-- ── LPL Club vs Sans Club ──────────────────────────────────────── -->
     <div class="table-card" style="margin-bottom:20px">
-      <div class="table-card-header">🔬 LPL Club vs Sans Club — Réachat Online uniquement</div>
+      <div class="table-card-header">🔬 LPL Club vs Sans Club — Réachat Online uniquement <span id="clubvs-cohort-label" style="font-weight:400;color:var(--muted);font-size:11px;margin-left:8px"></span></div>
       <div class="table-scroll">
         <table id="tbl-club-vs">
           <thead>
@@ -1068,12 +1068,17 @@ async function loadLpl() {
 
     // ── LPL Club vs Sans Club ────────────────────────────────────────────
     const tbClubVs = document.getElementById('tbl-club-vs').querySelector('tbody');
-    if (!Array.isArray(clubVs) || clubVs.error) {
+    if (clubVs.error || !clubVs.rows) {
       tbClubVs.innerHTML = `<tr><td colspan="7" class="loading-text">Erreur chargement</td></tr>`;
-    } else if (!clubVs.length) {
+    } else if (!clubVs.rows.length) {
       tbClubVs.innerHTML = `<tr><td colspan="7" class="loading-text">Aucune donnée</td></tr>`;
     } else {
-      tbClubVs.innerHTML = clubVs.map(r => {
+      // Afficher la période cohort dans le header
+      const cohortEl = document.getElementById('clubvs-cohort-label');
+      if (cohortEl && clubVs.cohort_start) {
+        cohortEl.textContent = `— cohorte clients depuis le ${clubVs.cohort_start}`;
+      }
+      tbClubVs.innerHTML = clubVs.rows.map(r => {
         const isClub = r.segment === 'LPL Club';
         const rowStyle = isClub ? 'background:#f0f6ff' : '';
         const segCell = isClub

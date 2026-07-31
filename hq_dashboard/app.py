@@ -731,10 +731,12 @@ def lpl_performance_cos():
 def lpl_club_vs_noclub():
     """
     Comparaison réachat LPL Club vs Sans Club — ONLINE uniquement (custom_transactions_history).
+    COHORT : uniquement les clients dont la 1ère commande web date du lancement du club (2026-04-01).
+    Cela garantit une comparaison équitable : nouveaux clients, même fenêtre temporelle,
+    avec ou sans adhésion — sans biais lié à l'historique pluriannuel des anciens clients.
     Club = clients ayant une adhésion web (lpl_club_web_orders ou shipping_method LPL Club).
-    Métriques : nb clients, commandes/client, taux réachat (≥2 commandes), taux 3+ commandes,
-                CA moyen/client, panier moyen.
     """
+    COHORT_START = "2026-04-01"
     q = f"""
     WITH
     club_web AS (
@@ -746,15 +748,18 @@ def lpl_club_vs_noclub():
             WHERE LOWER(shipping_method) LIKE '%lpl club%' AND {CTH_VALID}
         )
     ),
+    -- Uniquement les clients dont la 1ère commande web >= lancement club
+    -- Évite de mélanger des clients fidèles pluriannuels (sans club) avec de nouveaux membres
     web_stats AS (
         SELECT
-            LOWER(email) AS email,
+            LOWER(email)     AS email,
             COUNT(*)         AS nb_commandes,
             SUM(net_sales)   AS ca_total,
             AVG(net_sales)   AS panier_moy
         FROM `{PROJECT_ID}.shopify_data_eu.custom_transactions_history`
         WHERE {CTH_VALID}
         GROUP BY email
+        HAVING MIN(DATE(order_date)) >= '{COHORT_START}'
     )
     SELECT
         CASE WHEN c.email IS NOT NULL THEN 'LPL Club' ELSE 'Sans Club' END AS segment,
@@ -771,15 +776,18 @@ def lpl_club_vs_noclub():
     """
     try:
         rows = run_bq(q)
-        return jsonify([{
-            "segment":      r.segment,
-            "nb_clients":   int(r.nb_clients),
-            "commandes_moy": float(r.commandes_moy),
-            "taux_reachat": float(r.taux_reachat),
-            "taux_3plus":   float(r.taux_3plus),
-            "ca_moy_client":float(r.ca_moy_client),
-            "panier_moy":   float(r.panier_moy),
-        } for r in rows])
+        return jsonify({
+            "cohort_start": COHORT_START,
+            "rows": [{
+                "segment":       r.segment,
+                "nb_clients":    int(r.nb_clients),
+                "commandes_moy": float(r.commandes_moy),
+                "taux_reachat":  float(r.taux_reachat),
+                "taux_3plus":    float(r.taux_3plus),
+                "ca_moy_client": float(r.ca_moy_client),
+                "panier_moy":    float(r.panier_moy),
+            } for r in rows]
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
